@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from typing import List, Optional
 from app.models.user import User
 from app.services.auth_service import get_current_user
-from app.services.storage_service import upload_file, list_user_files, delete_file
+from app.services.storage_service import upload_file, list_user_files, delete_file, download_file
+from app.services.pdf_service import process_pdf_for_profile
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,24 @@ async def upload_pdf_file(
     try:
         # Upload file
         file_info = await upload_file(file, current_user.id, "pdf")
+        # Download the uploaded PDF for text extraction
+        pdf_bytes = await download_file(file_info["path"])
+        if pdf_bytes:
+            # Use the existing PDF service to extract text
+            extracted_text = process_pdf_for_profile(pdf_bytes)
+            
+            # Add text extraction info to response
+            file_info["text_extraction"] = {
+                "success": True,
+                "chunk_count": len(extracted_text) if isinstance(extracted_text, list) else 0,
+                "preview": extracted_text[0][:200] + "..." if isinstance(extracted_text, list) and extracted_text else "No text extracted"
+            }
+            
+        else:
+            file_info["text_extraction"] = {
+                "success": False,
+                "message": "Could not download file for text extraction"
+            }
         
         return {
             "message": "File uploaded successfully",
