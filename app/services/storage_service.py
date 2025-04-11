@@ -13,16 +13,19 @@ def init_storage_bucket():
     Initialize storage bucket if it doesn't exist.
     """
     try:
-        # Check if bucket exists
+        # Instead of creating bucket automatically, just check if it exists
+        # and assume we have access to it
         buckets = supabase.storage.list_buckets()
-        bucket_exists = any(bucket.name == settings.STORAGE_BUCKET for bucket in buckets)
+        bucket_names = [bucket.get('name', '') for bucket in buckets]
         
-        if not bucket_exists:
-            # Create bucket
-            supabase.storage.create_bucket(settings.STORAGE_BUCKET, {'public': False})
-            logger.info(f"Created storage bucket: {settings.STORAGE_BUCKET}")
+        if settings.STORAGE_BUCKET in bucket_names:
+            logger.info(f"Storage bucket {settings.STORAGE_BUCKET} exists")
+        else:
+            # Log warning but don't try to create it - do that manually in Supabase dashboard
+            logger.warning(f"Storage bucket {settings.STORAGE_BUCKET} doesn't exist. Please create it manually in the Supabase dashboard.")
     except Exception as e:
-        logger.error(f"Error initializing storage bucket: {str(e)}")
+        logger.error(f"Error checking storage buckets: {str(e)}")
+        logger.error(f"Bucket name: {settings.STORAGE_BUCKET}")
 
 async def upload_file(file: UploadFile, user_id: str, file_type: str) -> Dict[str, Any]:
     """
@@ -42,8 +45,20 @@ async def upload_file(file: UploadFile, user_id: str, file_type: str) -> Dict[st
         file_ext = os.path.splitext(file.filename)[1].lower()
         file_path = f"{user_id}/{file_type}/{file_id}{file_ext}"
         
+        # Ensure folder exists in Supabase Storage
+        try:
+            # Create folder structure if it doesn't exist
+            folder_path = f"{user_id}/{file_type}"
+            supabase.storage.from_(settings.STORAGE_BUCKET).list(folder_path)
+        except Exception:
+            # If folder doesn't exist, we'll continue and let the upload create it
+            logger.info(f"Folder {folder_path} will be created on upload")
+            
         # Read file content
         file_content = await file.read()
+        
+        # Debug log
+        logger.info(f"Attempting to upload file to bucket: {settings.STORAGE_BUCKET}, path: {file_path}")
         
         # Upload file
         supabase.storage.from_(settings.STORAGE_BUCKET).upload(
@@ -127,7 +142,11 @@ def list_user_files(user_id: str, file_type: Optional[str] = None) -> list:
             path = f"{user_id}/{file_type}"
         
         # List files
-        response = supabase.storage.from_(settings.STORAGE_BUCKET).list(path)
+        try:
+            response = supabase.storage.from_(settings.STORAGE_BUCKET).list(path)
+        except Exception as e:
+            logger.error(f"Error listing files at path {path}: {str(e)}")
+            return []
         
         # Get public URLs and add to response
         for item in response:
@@ -139,6 +158,3 @@ def list_user_files(user_id: str, file_type: Optional[str] = None) -> list:
     except Exception as e:
         logger.error(f"Error listing user files: {str(e)}")
         return []
-
-# Initialize storage bucket
-# init_storage_bucket()

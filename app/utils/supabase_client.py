@@ -14,6 +14,7 @@ def get_supabase_client() -> Client:
             supabase_url=settings.SUPABASE_URL,
             supabase_key=settings.SUPABASE_KEY
         )
+        print("supabase client created")
         return supabase_client
     except Exception as e:
         logger.error(f"Failed to create Supabase client: {str(e)}")

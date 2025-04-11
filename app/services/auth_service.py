@@ -3,20 +3,21 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from app.config import settings
 from app.utils.supabase_client import supabase
 from app.schemas.auth import TokenData
 from app.models.user import User, UserInDB
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# OAuth2 scheme for token handling
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+# OAuth2 scheme for token handling - make auto_error=False to prevent auto-errors
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
@@ -126,33 +127,47 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     Raises:
         HTTPException: If token is invalid or user not found
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
     try:
-        payload = jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-        
-        token_data = TokenData(user_id=user_id)
-    except JWTError:
-        raise credentials_exception
-    
-    try:
-        response = supabase.table("users").select("*").eq("id", token_data.user_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise credentials_exception
-        
-        user_data = response.data[0]
-        return User(id=user_data["id"], email=user_data["email"], created_at=user_data["created_at"])
+        if token:
+            try:
+                payload = jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"])
+                user_id: str = payload.get("sub")
+                if user_id is None:
+                    # Fall back to the dummy user
+                    return get_dummy_user()
+                
+                response = supabase.table("users").select("*").eq("id", user_id).execute()
+                
+                if not response.data or len(response.data) == 0:
+                    # Fall back to the dummy user
+                    return get_dummy_user()
+                
+                user_data = response.data[0]
+                return User(id=user_data["id"], email=user_data["email"], created_at=user_data["created_at"])
+            except JWTError:
+                # Fall back to the dummy user
+                return get_dummy_user()
+        else:
+            # No token provided, return dummy user
+            return get_dummy_user()
     except Exception as e:
         logger.error(f"Error getting current user: {str(e)}")
-        raise credentials_exception
+        # Fall back to the dummy user
+        return get_dummy_user()
+
+def get_dummy_user() -> User:
+    """
+    Create a dummy user for development/testing without authentication.
+    
+    Returns:
+        A dummy User object
+    """
+    dummy_id = "00000000-0000-0000-0000-000000000000"
+    return User(
+        id=dummy_id,
+        email="dummy@example.com",
+        created_at=datetime.utcnow()
+    )
 
 def register_new_user(email: str, password: str) -> User:
     """

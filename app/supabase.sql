@@ -63,8 +63,8 @@ CREATE POLICY generated_profiles_delete_policy ON public.generated_profiles
     FOR DELETE
     USING (auth.uid() = user_id);
 
--- Create new perfiles table for user information
-CREATE TABLE public.perfiles (
+-- Create new profiles table for user information
+CREATE TABLE public.profiles (
     id UUID PRIMARY KEY,
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     first_name TEXT,
@@ -82,26 +82,26 @@ CREATE TABLE public.perfiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add RLS policies for perfiles table
-ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
+-- Add RLS policies for profiles table
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Allow users to read only their own profile information
-CREATE POLICY perfiles_select_policy ON public.perfiles
+CREATE POLICY profiles_select_policy ON public.profiles
     FOR SELECT
     USING (auth.uid() = user_id);
 
 -- Allow users to insert their own profile information
-CREATE POLICY perfiles_insert_policy ON public.perfiles
+CREATE POLICY profiles_insert_policy ON public.profiles
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
 -- Allow users to update their own profile information
-CREATE POLICY perfiles_update_policy ON public.perfiles
+CREATE POLICY profiles_update_policy ON public.profiles
     FOR UPDATE
     USING (auth.uid() = user_id);
 
 -- Allow users to delete their own profile information
-CREATE POLICY perfiles_delete_policy ON public.perfiles
+CREATE POLICY profiles_delete_policy ON public.profiles
     FOR DELETE
     USING (auth.uid() = user_id);
 

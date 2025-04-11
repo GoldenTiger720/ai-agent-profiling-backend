@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Header, Request
 from typing import List, Optional
 from app.models.user import User
 from app.services.auth_service import get_current_user

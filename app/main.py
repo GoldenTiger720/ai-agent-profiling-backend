@@ -2,6 +2,14 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, profiles, uploads
 from app.config import settings
+from app.services.storage_service import init_storage_bucket
+import logging
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 # Create FastAPI application
 app = FastAPI(
@@ -10,13 +18,13 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware setup
+# CORS middleware setup with more permissive settings for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update this for production to include only trusted domains
+    allow_origins=["*"],  # Allow all origins in development
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Include routers
@@ -43,6 +51,14 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# Initialize storage bucket on startup
+@app.on_event("startup")
+async def startup_event():
+    logging.info("Initializing application...")
+    # Initialize storage bucket
+    init_storage_bucket()
+    logging.info("Application startup complete")
 
 if __name__ == "__main__":
     import uvicorn
