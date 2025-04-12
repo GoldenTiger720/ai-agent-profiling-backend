@@ -38,7 +38,7 @@ async def upload_pdf_file(
             file_info["text_extraction"] = {
                 "success": True,
                 "chunk_count": len(extracted_text) if isinstance(extracted_text, list) else 0,
-                "preview": extracted_text[0][:200] + "..." if isinstance(extracted_text, list) and extracted_text else "No text extracted"
+                "content": extracted_text[0] if isinstance(extracted_text, list) and extracted_text else "No text extracted"
             }
             
         else:
